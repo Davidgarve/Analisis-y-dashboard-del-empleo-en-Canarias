@@ -1,0 +1,918 @@
+---
+title: "Tasa de empleo en Canarias"
+output: flexdashboard::flex_dashboard
+runtime: shiny
+---
+
+```{r, message=FALSE}
+if (!require(highcharter)) install.packages('highcharter') 
+library(highcharter) 
+if (!require(leaflet)) install.packages('leaflet') 
+library(leaflet)  
+if (!require(geojsonio)) install.packages('geojsonio') 
+library(geojsonio) 
+if (!require(plotly)) install.packages('plotly') 
+library(plotly)
+
+
+if (!require(urca)) install.packages('urca') 
+library(urca)
+if (!require(GGally)) install.packages('GGally') 
+library(GGally)
+if (!require(pxR)) install.packages('pxR') 
+library(pxR)
+if (!require(wordcloud)) install.packages('wordcloud') 
+library(wordcloud)
+if (!require(patchwork)) install.packages('patchwork') 
+library(patchwork)
+
+if (!require(fpp3)) install.packages('fpp3') 
+library(fpp3)
+if (!require(tidyverse)) install.packages('tidyverse') 
+library(tidyverse)
+if (!require(ggplot2)) install.packages('ggplot2') 
+library(ggplot2)
+if (!require(RColorBrewer)) install.packages('RColorBrewer') 
+library(RColorBrewer)
+if (!require(openxlsx)) install.packages('openxlsx') 
+library(openxlsx)
+```
+
+```{r}
+empleo_canarias <- read.px("empleo_canarias.px")%>%
+  as_tibble()
+```
+```{r}
+poblacion_canarias <- read.px("poblacion.px")%>%
+  as_tibble()
+
+
+```
+```{r}
+poblacion_canarias2 <- poblacion_canarias %>%
+  filter(!Periodo %in% c(1996,1997,1998), Sexo == "Total") %>%
+  pivot_wider(names_from = Indicador, values_from = value) %>%
+  droplevels()
+
+```
+```{r}
+empleo_canarias2 <- empleo_canarias %>%
+   filter(!str_detect(Territorio, "Resto")) %>%
+   droplevels() %>%
+  pivot_wider(names_from = Situación.en.el.empleo, values_from = value) %>%
+  rename(no.autónomo = `Empleos por cuenta ajena`) %>%
+  rename(autónomo = `Empleos por cuenta propia`) %>%
+  mutate(Año = factor(str_extract(as.character(Periodo), "^[0-9]{4}")))
+
+
+```
+```{r}
+tablas_juntas <- left_join(poblacion_canarias2,empleo_canarias2,by = c("Periodo" = "Año", "Territorio"))
+
+tabla_final <- tablas_juntas %>%
+  rename(Fecha = Periodo.y) %>%
+  select(Fecha, Territorio, no.autónomo, autónomo, Total, Población)
+
+
+```
+```{r}
+tabla_final <- tablas_juntas %>%
+  rename(Fecha = Periodo.y) %>%
+  rename(Total.empleados = Total) %>%
+  select(Fecha, Territorio, no.autónomo, autónomo, Total.empleados, Población) %>%
+  pivot_longer(c(`no.autónomo`, `autónomo`, `Total.empleados`), names_to = "Situación.empleo", values_to = "Número.empleados")
+```
+```{r,message=FALSE,echo=FALSE}
+
+geoj <- geojson_read("geo_canarias_municipios.geojson",  what = "sp")
+
+tabla_geoj <- geoj %>% as_tibble()
+
+
+levels(tabla_final$Territorio)[levels(tabla_final$Territorio) == 'Frontera (hasta 2007)'] <- 'Frontera'
+
+
+tabla_final_geoj <- tabla_final %>%
+  filter(!Territorio %in% c("Canarias", "Gran Canaria", "La Palma", "La Gomera", "Lanzarote", "Fuerteventura", "El Hierro"), Fecha == "2023") %>%
+  pivot_wider(names_from = Situación.empleo, values_from = Número.empleados)
+
+juntas <- tabla_geoj %>%
+  left_join(tabla_final_geoj,join_by(etiqueta==Territorio))
+juntas <- juntas %>%
+  filter(!is.na(Población)) %>%
+  mutate(Total.empleados = Total.empleados / Población)  %>%
+  mutate(autónomo = autónomo / Población) %>%
+  mutate(no.autónomo = no.autónomo / Población)
+
+
+tabla_final2 <- tabla_final %>%
+  filter(!str_detect(Fecha, "trimestre"), Situación.empleo == "Total.empleados") %>%
+  pivot_wider(names_from = Situación.empleo, values_from = Número.empleados) %>%
+  mutate(Fecha = as.numeric(as.character(Fecha)))
+
+
+location <- levels(as.factor(tabla_final2$Territorio))
+
+years <- levels(as.factor(tabla_final2$Fecha))
+
+indicadores <- levels(as.factor((tabla_final$Situación.empleo)))
+
+
+data <- tabla_final %>%
+  pivot_wider(names_from = Situación.empleo, values_from = Número.empleados) %>%
+  filter( 
+    Territorio == "Gran Canaria" |
+    Territorio == "Tenerife" |
+    Territorio == "Lanzarote" |
+    Territorio == "Fuerteventura" | 
+    Territorio == "La Gomera" | 
+    Territorio == "La Palma" | 
+    Territorio == "El Hierro", Fecha == 2023
+  ) %>%
+  column_to_rownames(var="Territorio") %>%
+  select(Población,no.autónomo,autónomo, Total.empleados) 
+
+pca <- prcomp(data,scale = TRUE) 
+
+
+tabla_final3 <- tabla_final %>%
+  filter(!Territorio %in% c("Canarias", "Gran Canaria", "Tenerife", "Lanzarote", "Fuerteventura", "La Gomera", "El Hierro", "La Palma", "Las Palmas de Gran Canaria", "Santa Cruz de Tenerife")) %>%
+  pivot_wider(names_from = Situación.empleo, values_from = Número.empleados)
+
+```
+
+Datos
+===============================================
+Column {.sidebar data-width=230}
+--------------------------------------------------
+En el proyecto utilizo datos provenientes del ISTAC. Estos datos tratan del el número total de empleados, tanto autónomos, como no autónomos para cada isla y municipio de Canarias desde 1999. Además, se obtuvieron datos de la población de las islas desde 1999 para obtener la proporción de empleados por isla. Los tabla que se utilizo para realizar el proyecto tiene las siguientes variables:
+
+-Fecha: contiene todos los años y trimestres desde 1999.
+
+-Territorio: contiene todos los municipios e islas. Además, también tiene una categoría general llamada "Canarias".
+
+-Situación.empleo: contiene los indicadores: Total.empleados, no.autónomo y autónomo.
+
+-Población: contiene el total de la población para todas las combinaciones de territorio y fecha.
+
+-Número.empleados: El número correspondiente a la cantidad de empleados.
+
+Column
+--------------------------------------------------
+
+### 
+
+```{r}
+shiny::renderTable(
+  head(tabla_final, 15)
+)
+```
+
+
+
+
+Situación del empleo
+===============================================
+Column {.sidebar data-width=230}
+--------------------------------------------------
+
+
+```{r}
+shiny::selectInput(
+  "location", 
+  label = "Localización:",
+  choices = location, 
+  selected = "Lanzarote"
+)
+```
+
+```{r}
+shiny::selectInput(
+  "year", 
+  label = "Fecha:",
+  choices = years, 
+  selected = "2023"
+)
+```
+
+```{r}
+shiny::selectInput(
+  "indicator", 
+  label = "Indicador:",
+  choices = c("no.autónomo" = "no.autónomo",
+              "autónomo" = "autónomo",    
+              "Total.empleados" = "Total.empleados"), 
+  selected = "Total.empleados"
+)
+```
+
+Column{.tabset}
+--------------------------------------------------
+
+### Diagrama de barras
+
+```{r}
+renderPlotly({
+  p <- tabla_final %>%
+    filter(Territorio == input$location, Fecha == input$year) %>%
+    ggplot(aes(x = Situación.empleo, y = Número.empleados, fill = Situación.empleo)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    theme_minimal() +
+    labs(title = "Situación del empleo",
+         x = "Situación en el Empleo",
+         y = "Número de empleados",
+         fill = "Situación en el Empleo") +
+    scale_fill_brewer(palette = "Pastel1")
+  ggplotly(p)
+})
+```
+
+
+### Diagrama de barras agrupadas
+
+```{r}
+renderPlotly({
+  p <- tabla_final %>%
+  filter(Territorio %in% c("Lanzarote", "Fuerteventura", "Gran Canaria", 
+                           "Tenerife", "La Gomera", "La Palma", "El Hierro") &
+         Situación.empleo %in% c("autónomo", "no.autónomo"), Fecha == input$year) %>%
+  group_by(Territorio, Situación.empleo) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+  ggplot(aes(x = Territorio, y = empleado.por.isla, fill = Situación.empleo)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Empleos por cuenta ajena y propia para cada isla",
+       x = "Isla",
+       y = "Número de trabajadores por isla en %",
+       fill = "Situación en el Empleo") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+})
+```
+
+### Diagrama circular
+
+```{r}
+shiny::renderPlot({
+  tabla_final_filtrada <- tabla_final %>%
+  filter(!is.na(Población)) %>%
+    filter(Territorio == input$location, 
+         Situación.empleo == input$indicator, 
+         Fecha == input$year) %>%
+  group_by(Territorio) %>%
+  reframe(Total_Empleados = sum(Número.empleados, na.rm = TRUE), Población = Población) %>%
+  mutate(Percent_Empleados = Total_Empleados / Población,
+         Percent_No_Empleados = 1 - Percent_Empleados) %>%
+  select(Territorio, Percent_Empleados, Percent_No_Empleados)
+
+datos_para_grafico <- data.frame(
+  Estado = c("Con Empleo", "Sin Empleo"),
+  Porcentaje = c(tabla_final_filtrada$Percent_Empleados, tabla_final_filtrada$Percent_No_Empleados)
+)
+datos_para_grafico %>%
+  ggplot(aes(x = "", y = Porcentaje, fill = Estado)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y") +
+  scale_fill_manual(values = c("Con Empleo" = "#EE6363", "Sin Empleo" = "#B2DFEE")) +
+  labs(title = "Porcentaje de empleo",
+       fill = "Estado") +
+  geom_text(aes(label = scales::percent(Porcentaje)), position = position_stack(vjust = 0.5))
+})
+```
+
+### Boxplot
+
+```{r}
+renderPlotly({
+p <- tabla_final %>%
+  filter(Fecha %in% c("1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"),
+         Territorio == c("Gran Canaria", "Tenerife", "La Gomera", "El Hierro", "Lanzarote", "La Palma", "Fuerteventura"), Situación.empleo == input$indicator) %>%
+    mutate(Fecha = as.Date(paste0(Fecha, "-01-01"))) %>%
+  group_by(Territorio, Fecha) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+  ggplot(aes(x = Territorio, y = empleado.por.isla, fill=Territorio, label=Fecha)) +
+   geom_boxplot(outlier.shape = NA) +
+    geom_jitter(shape=16, position=position_jitter(0.2))+
+    theme(legend.position = "none") +
+    xlab("isla") + 
+  ylab("Número de Empleados") +
+  ggtitle("Evolución del Número de Empleados")
+
+ggplotly(p)
+
+})
+```
+
+### Serie temporal
+
+```{r}
+renderPlotly({
+ p <- tabla_final %>%
+  filter(Fecha %in% c("1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"),
+         Territorio %in% c("Gran Canaria", "Tenerife", "La Gomera", "El Hierro", "Lanzarote", "La Palma", "Fuerteventura"), Situación.empleo == input$indicator) %>%
+  mutate(Fecha = as.Date(paste0(Fecha, "-01-01"))) %>%
+  group_by(Territorio, Fecha) %>%
+  summarise(empleado_por_isla = Número.empleados / Población, .groups = 'drop') %>%
+  ggplot(aes(x = Fecha, y = empleado_por_isla, color = Territorio)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_x_date(date_breaks = "5 year", date_labels = "%Y") +
+  xlab("Año") + 
+  ylab("Proporción de Empleados") +
+  ggtitle("Evolución del Número de Empleados")
+
+ggplotly(p)
+})
+```
+
+### Mapa de calor de Gran Canaria
+
+```{r}
+renderPlotly({
+  tabla_final %>%
+  filter(Territorio %in% c("Agaete", "Agüimes", "Artenara", "Arucas", "Firgas", "Gáldar", "Ingenio", "Mogán", "Moya", "Las Palmas de Gran Canaria", "San Bartolomé de Tirajana", "La Aldea de San Nicolás", "Santa Brígida", "Santa Lucía de Tirajana", "Santa María de Guía de Gran Canaria", "Tejeda", "Telde", "Teror", "Valsequillo de Gran Canaria", "Valleseco", "Vega de San Mateo"), Fecha == input$year) %>%
+  group_by(Territorio, Situación.empleo) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+   ggplot(aes(Situación.empleo,Territorio,fill=empleado.por.isla)) + 
+    geom_tile(color = "lightblue",
+            lwd = 0.5,
+            linetype = 1) + 
+    scale_fill_gradientn(colors = brewer.pal(9, 'YlOrRd'))
+})
+```
+### Mapa de calor de Tenerife
+
+```{r}
+renderPlotly({
+  tabla_final %>%
+  filter(Territorio %in%  c("Adeje", "Arafo", "Arico", "Arona", "Buenavista del Norte", 
+                         "Candelaria", "Fasnia", "Garachico", "Granadilla de Abona", 
+                         "La Guancha", "Guía de Isora", "Güímar", "Icod de los Vinos", 
+                         "San Cristóbal de La Laguna", "La Matanza de Acentejo", "La Orotava",
+                         "Puerto de la Cruz", "Los Realejos", "El Rosario", "San Juan de la Rambla", "San Miguel de Abona", "Santa Cruz de Tenerife", "Santa Úrsula", "Santiago del Teide", "El Sauzal", "Los Silos", "Tacoronte", "El Tanque", "Tegueste", "La Victoria de Acentejo", "Vilaflor de Chasna"), Fecha == input$year) %>%
+  group_by(Territorio, Situación.empleo) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+   ggplot(aes(Situación.empleo,Territorio,fill=empleado.por.isla)) + 
+    geom_tile(color = "lightblue",
+            lwd = 0.5,
+            linetype = 1) + 
+    scale_fill_gradientn(colors = brewer.pal(9, 'YlOrRd'))
+})
+```
+
+### Mapa de calor de La Palma
+
+```{r}
+renderPlotly({
+  tabla_final %>%
+  filter(Territorio %in% c("Barlovento", "Breña Alta", "Breña Baja", "Fuencaliente de La Palma",
+                         "Garafía", "Los Llanos de Aridane", "El Paso", "Puntagorda",
+                         "Puntallana", "San Andrés y Sauces", "Santa Cruz de La Palma",
+                         "Tazacorte", "Tijarafe", "Villa de Mazo"), Fecha == input$year) %>%
+  group_by(Territorio, Situación.empleo) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+   ggplot(aes(Situación.empleo,Territorio,fill=empleado.por.isla)) + 
+    geom_tile(color = "lightblue",
+            lwd = 0.5,
+            linetype = 1) + 
+    scale_fill_gradientn(colors = brewer.pal(9, 'YlOrRd'))
+})
+```
+Evolución del empleo en Canarias
+===============================================
+
+Column {.sidebar data-width=230}
+--------------------------------------------------
+
+```{r}
+shiny::selectInput(
+  "country1", # nombre de uso interno del campo. Se accede al campo haciendo input$country1
+  label = "Localización 1:", # etiqueta del campo para presentar en el cuadro de mando
+  choices = location, # vector con las opciones para seleccionar 
+  selected = "Gran Canaria" # la opción seleccionada por defecto 
+)
+```
+
+```{r}
+shiny::selectInput(
+  "country2", 
+  label = "Localización 2:",
+  choices = location, 
+  selected = "Tenerife"
+)
+```
+
+```{r}
+shiny::selectInput(
+  "country3", 
+  label = "Localización 3:",
+  choices = location,
+  selected = "Lanzarote"
+)
+```
+
+```{r}
+shiny::selectInput(
+  "country4", 
+  label = "Localización 4:",
+  choices = location,
+  selected = "Fuerteventura"
+)
+```
+
+```{r}
+shiny::selectInput(
+  "yearinit", 
+  label = "Fecha de inicio:",
+  choices = years, 
+  selected = "1999"
+)
+```
+
+```{r}
+shiny::selectInput(
+  "yearend", 
+  label = "Fecha de fin:",
+  choices = years, 
+  selected = "2023"
+)
+```
+
+Column
+--------------------------------------------------
+
+###  
+```{r} 
+renderHighchart({
+ tsibble( # Creación de la serie temporal que se dibujará con hchart 
+  date = tabla_final2$Fecha,
+  empleados = tabla_final2$Total.empleados,
+  location = tabla_final2$Territorio,
+  index = date,
+  key = c(location,empleados)) %>%
+    arrange(desc(date)) %>%
+    filter(location == input$country1) %>% 
+    filter(date >= input$yearinit & date <= input$yearend) %>% 
+    hchart("line",hcaes(x = date, y = empleados, group = location))
+})
+```
+
+###
+
+```{r} 
+renderHighchart({
+ tsibble( # Creación de la serie temporal que se dibujará con hchart 
+  date = tabla_final2$Fecha,
+  empleados = tabla_final2$Total.empleados,
+  location = tabla_final2$Territorio,
+  index = date,
+  key = c(location,empleados)) %>%
+    arrange(desc(date)) %>%
+    filter(location == input$country2) %>% 
+    filter(date >= input$yearinit & date <= input$yearend) %>% 
+    hchart("line",hcaes(x = date, y = empleados, group = location))
+})
+```
+
+
+Column
+--------------------------------------------------
+
+
+### 
+
+
+```{r} 
+renderHighchart({
+ tsibble( # Creación de la serie temporal que se dibujará con hchart 
+  date = tabla_final2$Fecha,
+  empleados = tabla_final2$Total.empleados,
+  location = tabla_final2$Territorio,
+  index = date,
+  key = c(location,empleados)) %>% 
+    arrange(desc(date)) %>%
+    filter(location == input$country3) %>% 
+    filter(date >= input$yearinit & date <= input$yearend) %>% 
+    hchart("line",hcaes(x = date, y = empleados, group = location))
+})
+```
+
+###
+
+```{r} 
+renderHighchart({
+ tsibble( # Creación de la serie temporal que se dibujará con hchart 
+  date = tabla_final2$Fecha,
+  empleados = tabla_final2$Total.empleados,
+  location = tabla_final2$Territorio,
+  index = date,
+  key = c(location,empleados)) %>% 
+    arrange(desc(date)) %>%
+    filter(location == input$country4) %>% 
+    filter(date >= input$yearinit & date <= input$yearend) %>% 
+    hchart("line",hcaes(x = date, y = empleados, group = location))
+})
+```
+
+
+
+Mapa coroplético
+===============================================
+
+Column {.sidebar data-width=230}
+--------------------------------------------------
+
+```{r}
+shiny::selectInput(
+  "indicator", 
+  label = "Indicador:",
+  choices = c("no.autónomo" = "no.autónomo",
+              "autónomo" = "autónomo",    
+              "Total.empleados" = "Total.empleados"), 
+  selected = "Total.empleados"
+)
+```
+
+### 
+
+```{r}
+shiny::renderTable({
+  data <- juntas[[which(names(juntas)==input$indicator)]]
+  tibble( 
+    etiqueta=juntas$etiqueta,
+    value=round(data,digits=2)
+  ) %>%
+    filter(is.na(value)==FALSE) %>%
+    arrange(desc(value)) %>%
+    mutate(value=prettyNum(round(value,digits=2))) %>%
+    head(300)
+})
+```
+
+
+
+Column
+--------------------------------------------------
+
+### 
+
+```{r}
+renderLeaflet({
+
+data <- juntas[[which(names(juntas)==input$indicator)]]
+
+ etiquetas <-paste("<strong> ",juntas$etiqueta ,"</strong><br>",input$indicator,": ",prettyNum(round(data,digits=2), big.mark = ",", scientific = FALSE))  %>%
+  lapply(htmltools::HTML)
+
+pal <- colorQuantile("YlOrRd", data, n = 9)
+geoj %>%
+  leaflet() %>%  
+  setView(lng = -16.6291, lat = 28.2916, zoom = 7) %>% 
+  addPolygons(
+    fillColor = ~pal(data), 
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions( 
+      weight = 2,
+      color = rgb(0.2,0.2,0.2),
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE
+    ),
+    label = etiquetas 
+  ) %>% 
+  addLegend("bottomleft", pal = pal, values = data,
+    title = input$indicator,
+    labFormat = function(type, cuts, p) {
+          n = length(cuts) 
+          x = (cuts[-n] + cuts[-1])/2
+          x=prettyNum(round(x,digits=2), big.mark = ",", scientific = FALSE)
+          as.character(x)
+        },
+    opacity = 1
+  )
+})
+```
+
+
+
+
+Predicción del empleo
+===============================================
+
+Column {.sidebar data-width=230}
+--------------------------------------------------
+
+```{r}
+shiny::selectInput("municipio", "Elija un municipio:", choices = unique(tabla_final$Territorio))
+
+# Input para seleccionar el período de predicción
+shiny::numericInput("periodo_prediccion", "Período de predicción (en años):", value = 1, min = 1, max = 5)
+```
+
+
+Column{.tabset}
+--------------------------------------------------
+
+### Con el periodo del covid
+
+```{r}
+shiny::renderPlot({
+  # Filtrar datos según la selección del usuario
+  datos_filtrados <- tabla_final %>%
+    filter(Territorio == input$municipio, Situación.empleo == "Total.empleados") %>%
+    mutate(Fecha = case_when(
+      str_detect(Fecha, "Primer trimestre") ~ str_replace(Fecha, "Primer trimestre", "Q1"),
+      str_detect(Fecha, "Segundo trimestre") ~ str_replace(Fecha, "Segundo trimestre", "Q2"),
+      str_detect(Fecha, "Tercer trimestre") ~ str_replace(Fecha, "Tercer trimestre", "Q3"),
+      str_detect(Fecha, "Cuarto trimestre") ~ str_replace(Fecha, "Cuarto trimestre", "Q4")
+    )) %>%
+    filter(!is.na(Fecha)) %>%  # Eliminar las filas donde Fecha es NA
+    mutate(Fecha = yearquarter(Fecha)) %>%  # Convertir a formato yearquarter
+    select(Fecha, Número.empleados, Territorio) %>%
+    rename(empleados = Número.empleados) %>%
+    as_tsibble(index = Fecha, key = Territorio)
+
+  # Modelo ARIMA
+  fit <- datos_filtrados %>%
+    model(ARIMA(empleados))
+
+  # Predicción
+  h <- as.integer(input$periodo_prediccion) * 4  # Convertir años a trimestres
+  prediccion <- forecast(fit, h = h)
+
+  # Gráfico de la predicción
+  prediccion |>
+  autoplot(datos_filtrados) + 
+    labs(title = paste("Predicción ARIMA para", input$municipio),
+         x = "Fecha", y = "Número de empleados")
+})
+
+
+```
+
+Row
+--------------------------------------------------
+
+```{r}
+shiny::renderPlot({
+  datos_filtrados <- tabla_final %>%
+    filter(Territorio == input$municipio, Situación.empleo == "Total.empleados") %>%
+    mutate(Fecha = case_when(
+      str_detect(Fecha, "Primer trimestre") ~ str_replace(Fecha, "Primer trimestre", "Q1"),
+      str_detect(Fecha, "Segundo trimestre") ~ str_replace(Fecha, "Segundo trimestre", "Q2"),
+      str_detect(Fecha, "Tercer trimestre") ~ str_replace(Fecha, "Tercer trimestre", "Q3"),
+      str_detect(Fecha, "Cuarto trimestre") ~ str_replace(Fecha, "Cuarto trimestre", "Q4")
+    )) %>%
+    filter(!is.na(Fecha)) %>%  # Eliminar las filas donde Fecha es NA
+    mutate(Fecha = yearquarter(Fecha)) %>%  # Convertir a formato yearquarter
+    select(Fecha, Número.empleados, Territorio) %>%
+    rename(empleados = Número.empleados) %>%
+    as_tsibble(index = Fecha, key = Territorio)
+datos_filtrados |>
+  model(
+    STL(empleados ~ season(period = 4),
+    robust = TRUE)
+  ) |>
+  components() |>
+  autoplot()
+})
+```
+
+### Sin el periodo del covid
+
+```{r}
+shiny::renderPlot({
+  # Filtrar datos según la selección del usuario
+  datos_filtrados <- tabla_final %>%
+    filter(Territorio == input$municipio, Situación.empleo == "Total.empleados") %>%
+    mutate(Fecha = case_when(
+      str_detect(Fecha, "Primer trimestre") ~ str_replace(Fecha, "Primer trimestre", "Q1"),
+      str_detect(Fecha, "Segundo trimestre") ~ str_replace(Fecha, "Segundo trimestre", "Q2"),
+      str_detect(Fecha, "Tercer trimestre") ~ str_replace(Fecha, "Tercer trimestre", "Q3"),
+      str_detect(Fecha, "Cuarto trimestre") ~ str_replace(Fecha, "Cuarto trimestre", "Q4")
+    )) %>%
+    filter(!is.na(Fecha)) %>%  # Eliminar las filas donde Fecha es NA
+    mutate(Fecha = yearquarter(Fecha)) %>%  # Convertir a formato yearquarter
+    select(Fecha, Número.empleados, Territorio) %>%
+    rename(empleados = Número.empleados) %>%
+  filter(!Fecha %in% c("2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4")) %>%
+    as_tsibble(index = Fecha, key = Territorio)  %>%
+  fill_gaps()
+
+  # Modelo ARIMA
+  fit <- datos_filtrados %>%
+    model(ARIMA(empleados))
+
+  # Predicción
+  h <- as.integer(input$periodo_prediccion) * 4  # Convertir años a trimestres
+  prediccion <- forecast(fit, h = h)
+
+  # Gráfico de la predicción
+  prediccion |>
+  autoplot(datos_filtrados) + 
+    labs(title = paste("Predicción ARIMA para", input$municipio),
+         x = "Fecha", y = "Número de empleados")
+})
+
+
+```
+
+
+Análisis de atributos
+=====================================  
+
+Row 
+-------------------------------------
+### Matriz de correlación 
+
+```{r}
+
+highcharter::renderHighchart({
+data %>% 
+  scale()  %>%
+  cor(use='complete.obs') %>% 
+  hchart() 
+})
+
+
+```   
+ 
+### Porcentaje de varianza explicada por la componentes principales
+    
+```{r}
+
+renderPlotly({
+  p <- tibble(
+  label=fct_inorder(paste("PC",1:length(pca$sdev))),
+  varPercent = pca$sdev^2/sum(pca$sdev^2) * 100
+) %>%
+  ggplot(aes(label,varPercent)) +
+    geom_bar(stat = "identity") +
+    labs(x= "Componentes Principales", 
+          y= "Porcentaje varianza explicada"
+    )
+ggplotly(p)
+})
+```
+
+
+   
+Row 
+-------------------------------------
+   
+### Gráfico de dispersión con las dos primeras componentes
+    
+```{r}
+highcharter::renderHighchart({
+  hchart(pca) 
+})
+```
+
+Comparación de indicadores
+=====================================  
+
+Column {.sidebar data-width=230}
+--------------------------------------------------
+
+```{r}
+# Widgets para selección de parámetros 
+shiny::selectInput(
+  "x", 
+  label = "Indicador 1:",
+  choices = indicadores, 
+  selected = "Total.empleados"
+)
+
+shiny::selectInput(
+  "x_scale", 
+  label = "Escalador para el Indicador 1:",
+  choices = c("none",
+              "sqrt",    
+              "log"
+             ), 
+  selected = "none"
+)
+
+shiny::selectInput(
+  "y", 
+  label = "Indicador 2:",
+  choices = indicadores, 
+  selected = "no.autónomo"
+)
+
+shiny::selectInput(
+  "y_scale", 
+  label = "Escalador para el Indicador 2:",
+  choices = c("none",
+              "log"
+             ), 
+  selected = "none"
+)
+```
+
+### Resultados
+
+```{r}
+shiny::renderTable({
+   # Creamos una tabla con los 2 indicadores 
+   tb <- tibble(
+      country = tabla_final3$Territorio,
+      x = tabla_final3[[which(names(tabla_final3)==input$x)]],
+      y = tabla_final3[[which(names(tabla_final3)==input$y)]]
+    ) 
+    tb <- tb %>% 
+          filter(is.na(x)!=TRUE & is.na(y)!=TRUE )
+  
+  # escalamos los indicadores de acuerdo con los parámetros de escalado   
+  if(input$x_scale=="sqrt") tb$x <- sqrt(tb$x)
+  if(input$x_scale=="log") tb$x <- log(tb$x)  
+  if(input$y_scale=="log") tb$y <- log(tb$y)  
+  
+  # Cálculo regresión lineal después del escalado de las variables. 
+  fit <- lm(y ~ x,data=tb)
+ 
+  labels <- c("Correlación",
+             "Pendiente de la regresión lineal",
+             "Independencia de la regresión lineal") 
+  values <- c(round(cor(tb$x,tb$y),digits = 4),
+              fit$coefficients[2],
+              fit$coefficients[1])
+    
+  tb2 <- tibble( parametro=labels,
+                 valor=values)
+  tb2
+ 
+})
+```
+
+
+
+Column
+--------------------------------------------------
+
+### Comparación de los indicadores para todos los municipios, excepto Las Palmas de Gran Canaria y Santa Cruz de Tenerife
+```{r} 
+renderPlotly({
+  tb <- tibble(
+      country = tabla_final3$Territorio,
+      x = tabla_final3[[which(names(tabla_final3)==input$x)]],
+      y = tabla_final3[[which(names(tabla_final3)==input$y)]]
+    ) 
+    tb <- tb %>% 
+          filter(is.na(x)!=TRUE & is.na(y)!=TRUE )
+    
+  if(input$x_scale=="sqrt") tb$x <- sqrt(tb$x)
+  if(input$x_scale=="log") tb$x <- log(tb$x)  
+    
+  if(input$y_scale=="log") tb$y <- log(tb$y)  
+  
+  fit <- lm(y ~ x,data=tb)
+  a <- fit$coefficients[2]
+  b <- fit$coefficients[1]
+  p <- tb %>%
+        ggplot(aes(x,y,color=country)) + 
+        geom_point() +
+        theme(legend.position = "none") +
+        labs(x= input$x, y= input$y)
+  
+  xmin <- layer_scales(p)$x$get_limits()[1]
+  xmax <- layer_scales(p)$x$get_limits()[2]
+  ymin <- layer_scales(p)$y$get_limits()[1]
+  ymax <- layer_scales(p)$y$get_limits()[2]
+  
+  if(a*xmin+b<ymin) xmin <- (ymin-b)/a
+  if(a*xmin+b>ymax) xmin <- (ymax-b)/a
+  if(a*xmax+b<ymin) xmax <- (ymin-b)/a
+  if(a*xmax+b>ymax) xmax <- (ymax-b)/a
+  
+  df <- data.frame(x1 = xmin, x2 = xmax, y1 = a*xmin+b, y2 = a*xmax+b)
+  
+  p2 <- p +
+        geom_segment(aes(x = x1, y = y1, xend = x2, yend = y2, color = "blue"), data = df)
+  ggplotly(p2) 
+  
+})
+```
+
+Column {data-width=400}
+--------------------------------------------------
+
+### Valores originales de los indicadores
+
+```{r}
+shiny::renderTable({
+  tibble(
+      territorio = tabla_final3$Territorio,
+       indicador1 = tabla_final3[[which(names(tabla_final3)==input$x)]],
+       indicador2 = tabla_final3[[which(names(tabla_final3)==input$y)]]
+    ) %>% 
+      filter(is.na(indicador1)!=TRUE & is.na(indicador2)!=TRUE ) %>%
+      arrange(desc(indicador1)) %>%
+      #setNames(c("country",paste("highest_",input$x),input$y))  %>%
+      head(300)
+})
+```

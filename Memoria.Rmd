@@ -1,0 +1,582 @@
+---
+title: "Empleo en Canarias"
+author: "David García Vera"
+output: html_document
+---
+
+[Enlace cuadro de mandos](http://10.22.143.222:3838/sample-apps/a2415/Dashboard.Rmd).
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+if (!require(highcharter)) install.packages('highcharter') 
+library(highcharter) 
+if (!require(leaflet)) install.packages('leaflet') 
+library(leaflet)  
+if (!require(geojsonio)) install.packages('geojsonio') 
+library(geojsonio) 
+if (!require(plotly)) install.packages('plotly') 
+library(plotly)
+
+
+if (!require(urca)) install.packages('urca') 
+library(urca)
+if (!require(GGally)) install.packages('GGally') 
+library(GGally)
+if (!require(pxR)) install.packages('pxR') 
+library(pxR)
+if (!require(wordcloud)) install.packages('wordcloud') 
+library(wordcloud)
+if (!require(patchwork)) install.packages('patchwork') 
+library(patchwork)
+
+if (!require(fpp3)) install.packages('fpp3') 
+library(fpp3)
+if (!require(tidyverse)) install.packages('tidyverse') 
+library(tidyverse)
+if (!require(ggplot2)) install.packages('ggplot2') 
+library(ggplot2)
+if (!require(RColorBrewer)) install.packages('RColorBrewer') 
+library(RColorBrewer)
+if (!require(openxlsx)) install.packages('openxlsx') 
+library(openxlsx)
+```
+
+## Introducción
+Este proyecto busca abordar la necesidad crítica de un análisis comprensivo del mercado laboral en Canarias, poniendo especial énfasis en la distinción entre empleo autónomo y asalariado en diferentes islas y municipios. Mediante la aplicación de tecnologías avanzadas en visualización de datos y modelado predictivo, el proyecto tiene como objetivo proporcionar un análisis detallado que pueda anticipar tendencias futuras y mejorar la formulación de políticas laborales. Este enfoque no solo pretende ofrecer soluciones específicas para Canarias sino también crear un modelo replicable para otras regiones que enfrentan desafíos similares, fortaleciendo su capacidad para responder a impactos económicos tanto globales como locales.
+
+## Estado Actual y Objetivos del Proyecto
+#### Contexto Actual
+El mercado laboral en Canarias se caracteriza por su dinamismo y variabilidad, influenciado tanto por factores económicos internacionales como por particularidades locales propias de su naturaleza insular. La economía de las islas ha sido históricamente dependiente del turismo, sector que exhibe alta sensibilidad a las fluctuaciones económicas globales y eventos como la crisis financiera de 2008 y la reciente pandemia de COVID-19. Estos eventos han subrayado la fragilidad del empleo en la región, afectando desproporcionadamente a los trabajadores autónomos y asalariados.
+
+Sin embargo, a pesar de la relevancia del tema, hay una carencia notable de análisis continuados y detallados que desglosen la evolución del empleo por isla y municipio, diferenciando entre empleo autónomo y asalariado, y su correlación con la población activa de cada área.
+
+#### Motivación
+Este proyecto surge de la necesidad urgente de proporcionar un análisis exhaustivo y actualizado que sirva de apoyo para la planificación económica y social en Canarias. La finalidad es contribuir a la creación de políticas más efectivas y adaptadas a las características específicas del archipiélago, y a su vez, fortalecer la capacidad de respuesta del mercado laboral frente a posibles crisis futuras. Además, se busca dotar a los actores locales de herramientas avanzadas de análisis y visualización que faciliten una comprensión más profunda y accesible de las dinámicas de empleo en la región.
+
+#### Objetivos del Proyecto
+Análisis Profundo por Islas y Municipios:
+Profundizar en las características y tendencias del empleo en cada una de las islas y municipios del archipiélago, identificando los factores clave que influyen en estas dinámicas.
+
+Herramientas Dinámicas de Visualización:
+Desarrollar y proporcionar herramientas interactivas de visualización que permitan explorar los datos de empleo y demográficos, facilitando su análisis por diferentes categorías y períodos.
+
+Modelado Predictivo:
+Aplicar modelos estadísticos y predictivos para proyectar la evolución futura del empleo en Canarias, considerando diversos escenarios económicos y políticos.
+
+Recomendaciones para Políticas:
+Basándonos en los análisis efectuados, generar recomendaciones dirigidas a mejorar la calidad y estabilidad del empleo, así como a fomentar la diversificación económica de las islas.
+
+Estudio de Resiliencia Laboral:
+Examinar cómo diversos factores externos, como crisis económicas y pandemias, impactan el empleo en Canarias, proponiendo medidas para incrementar la resiliencia del mercado laboral.
+
+Con estos objetivos, el proyecto pretende no solo ofrecer una radiografía detallada del empleo en Canarias, sino también apoyar la toma de decisiones y contribuir al desarrollo económico sostenible y la estabilidad laboral en el archipiélago
+
+
+
+
+## Aportaciones del Proyecto
+Este proyecto aportará significativamente al entorno socioeconómico, técnico y científico de Canarias, proporcionando insights esenciales para la mejora de políticas públicas y fomentando la estabilidad laboral a través de un análisis detallado y regionalizado del mercado laboral. Desde el punto de vista técnico, el desarrollo de herramientas interactivas de visualización de datos y la implementación de modelos predictivos avanzados como ARIMA mejorará la capacidad de análisis y previsión de tendencias de empleo. Estas herramientas y metodologías no solo facilitarán la toma de decisiones informada sino que también contribuirán al conocimiento académico, estableciendo nuevas metodologías para estudios futuros en contextos geográficos y económicos similares. En suma, el proyecto busca impulsar un desarrollo socioeconómico equitativo en Canarias y establecer un precedente en la aplicación de tecnologías analíticas avanzadas.
+
+## Datos utilizados y su análisis y preprocesado
+**Descripción de los datos:** En el trabajo de curso utilizo datos provenientes del ISTAC. Estos datos tratan del el número total de empleados, tanto autónomos, como no autónomos para cada isla y municipio de Canarias desde 1999. Además, se obtuvieron datos de la población de las islas desde 1999 para obtener la proporción de empleados por isla.
+
+#### Tabla de Empleo:
+
+-Periodo: Categoría temporal de los datos (e.g., año, trimestre).
+
+-Situación.en.el.empleo: Clasificación del tipo de empleo (e.g., Total, Empleos por cuenta ajena, autónomos).
+
+-Territorio: Ubicación geográfica (e.g., Canarias, Lanzarote, etc.).
+
+-value: Número correspondiente a la cantidad de empleados.
+
+#### Tabla de Población
+
+-Indicador: Tipo de dato demográfico (e.g., Población total, Variación anual de la población).
+
+-Periodo: Año de los datos reportados.
+
+-Sexo: Clasificación por género (Total, Hombres, Mujeres).
+
+-Territorio: Localización específica de los datos (e.g., Canarias, Lanzarote, etc.).
+
+-value: Cifra correspondiente a la medida del indicador (e.g., total de población, cambio anual).
+
+```{r}
+empleo_canarias <- read.px("empleo_canarias.px")%>%
+  as_tibble()
+
+
+```
+```{r}
+poblacion_canarias <- read.px("poblacion.px")%>%
+  as_tibble()
+
+
+```
+**Análisis exploratorio inicial: ** Como se observa la tabla del empleo en Canarias se divide en cuatro columnas: Territorio, Fecha, Situación.en.el.empleo y value. En esta tabla se encontraron tres incidencias, una de ellas es que los datos del municipio de La Palma, Frontera, solo posee datos a partir del 2007, la otra incidencia se trata de que algunos de los municipios empiezan a tener datos a partir de 1996, para evitar NA, se asume que todos los datos empiezan a partir de 1999, la última trata de que en el factor de Territorio había un elemento llamado "Resto" que era irrelevante. En cuanto a la tabla de población, nos encontranos con las siguientes variables: Indicador, Periodo, Sexo, Territorio y value. De esta tabla solo me interesa el indicador de población, el Territorio, el Periodo y el value. En esta tabla me encontre también con el problema de que para algunos municipios los datos no empezaban hasta 1999. Además, en esta tabla los datos eran anuales en lugar de trimestales y por tanto no podía realizar un left_join de forma directa.
+
+```{r}
+poblacion_canarias2 <- poblacion_canarias %>%
+  filter(!Periodo %in% c(1996,1997,1998), Sexo == "Total") %>%
+  pivot_wider(names_from = Indicador, values_from = value) %>%
+  droplevels()
+
+```
+```{r}
+empleo_canarias2 <- empleo_canarias %>%
+   filter(!str_detect(Territorio, "Resto")) %>%
+   droplevels() %>%
+  pivot_wider(names_from = Situación.en.el.empleo, values_from = value) %>%
+  rename(no.autónomo = `Empleos por cuenta ajena`) %>%
+  rename(autónomo = `Empleos por cuenta propia`) %>%
+  mutate(Año = factor(str_extract(as.character(Periodo), "^[0-9]{4}")))
+
+
+```
+```{r}
+tablas_juntas <- left_join(poblacion_canarias2,empleo_canarias2,by = c("Periodo" = "Año", "Territorio"))
+
+tabla_final <- tablas_juntas %>%
+  rename(Fecha = Periodo.y) %>%
+  select(Fecha, Territorio, no.autónomo, autónomo, Total, Población)
+
+
+```
+```{r}
+tabla_final <- tablas_juntas %>%
+  rename(Fecha = Periodo.y) %>%
+  rename(Total.empleados = Total) %>%
+  select(Fecha, Territorio, no.autónomo, autónomo, Total.empleados, Población) %>%
+  pivot_longer(c(`no.autónomo`, `autónomo`, `Total.empleados`), names_to = "Situación.empleo", values_to ="Número.empleados")
+
+```
+**Preprocesado de los datos: ** Como mencione en el análisis exploratorio inicial, elimine las fechas desde 1996 hasta 1998 y realice un pivot_wider a la tabla población estando ya lista para realizar el left_join. Para la tabla del empleo, elimine el las filas cuyo Territorio sea "Resto" y añadí una nueva columna denominada "Año" para poder juntar ambas tablas. Tras esto, junte ambas tablas y este es el resultado:
+
+-Fecha: Categoría temporal de los datos, que puede incluir año o especificaciones como trimestre.
+
+-Territorio: Ubicación geográfica de los datos, como Canarias, Lanzarote, etc.
+
+-Población: Cantidad total de población en el territorio especificado.
+
+-Situación.empleo: Clasificación del tipo de empleo (no autónomo, autónomo, total de empleados).
+
+-Número.empleados: Número correspondiente a la cantidad de empleados bajo la clasificación dada en "Situación.empleo".
+
+## Visualización y análisis
+
+### Situación del empleo en canarias en 2023
+Para empezar quería tener un visión general de la situación del empleo para cada indicador, es decir, para el total, si eres autónomo y si no lo eres. Para ello, elaboré un diagrama de barras interactivo con el que puedes observar a nivel autónomico cada uno de esos indicadores en 2023. Además, en la subpestaña "Diagrama de barras", que esta en la pestaña "Situación de empelo" del dashboard puedes modificar la fecha y la localización como desees. El propósito principal de este diagrama es conocer el total de empleados y como se distribuye el número de autónomos respecto al total.
+
+```{r}
+  p <- tabla_final %>%
+    filter(Territorio == "Canarias", Fecha == "2023") %>%
+    ggplot(aes(x = Situación.empleo, y = Número.empleados, fill = Situación.empleo)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    theme_minimal() +
+    labs(title = "Situación del empleo",
+         x = "Situación en el Empleo",
+         y = "Número de empleados",
+         fill = "Situación en el Empleo en 2023") +
+    scale_fill_brewer(palette = "Pastel1")
+  ggplotly(p)
+```
+
+**Conclusión: ** Como se puede observar el empleo en Canarias roza el millón de trabajadores, siendo la mayoría de los trabajadores no autónomos superando los 750000 de trabajadores. Por tanto, podemos decir que al menos a nivel autonómico el empelo está dirigido principalmente por trabajadores que no son autónomos.
+
+### División del empleo en todas las islas en función de su población en 2023
+Como la información que obtuve en el diagrama anterior era muy general decidí hacer un diagrama de barras agrupadas para cada una de islas para el mismo año (2023), pero como hay islas con una población muy superior a otras no se tenía en cuenta la proporción real del número de empleados. Para solucionar está problemática calculé la proporción del número de empleados, es decir, el número de empleados dividido por la población total de la isla en cuestión. Este diagrama también se encuentra en el dashboard, en la subpestaña "Diagrama de barras agrupadas" que está en la pestaña "Situación del empleo", en el podrás modificar el año para el que se hace la comparación. El proposito de este diagrama es averiguar si para cada isla también existe esa tendencia predominante de un mayor número de no autónomos que autónomos vista en el diagrama anterior a nivel autonómico.
+```{r}
+p <- tabla_final %>%
+  filter(Territorio %in% c("Lanzarote", "Fuerteventura", "Gran Canaria", 
+                           "Tenerife", "La Gomera", "La Palma", "El Hierro") &
+         Situación.empleo %in% c("autónomo", "no.autónomo"), Fecha == "2023") %>%
+  group_by(Territorio, Situación.empleo) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+  ggplot(aes(x = Territorio, y = empleado.por.isla, fill = Situación.empleo)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Empleos por cuenta ajena y propia para cada isla en 2023",
+       x = "Isla",
+       y = "Número de trabajadores por isla en %",
+       fill = "Situación en el Empleo") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplotly(p)
+
+```
+
+**Conclusión: ** Como podemos observar en el diagrama la tendencia se repite respecto al diagrama anterior, y es que todas las islas parecen seguir un mismo patrón, una mayoría de trabajadores que no son autónomos. Destacar también que la proporción de trabajadores autónomos no supera en ninguna isla el 10% de la población, siendo la más alta en La Palma con un 7.4% del total de los habitantes de la isla. Aunque la tasa más pequeña no se encuentra muy alejada de La Palma, siendo Gran Canaria la isla con menor número de autónomos con un 5.81%.   
+
+## Evolución del empleo en Canarias
+A continuación, estudiaré cuales son las islas con una mayor proporción de empleados y además estudiar su evolución a lo largo de los años disponibles. Para ello elabolaré un boxplot para estudiar como a evolucionado la variación del empleo en cada isla a lo largo del tiempo. Además, este boxplot también se encuentra en el dashboard, en la subpestaña "Boxplot" que está en la pestaña "Situación del empleo", en el podrás modificar los indicadores del empleo, es decir, el total de empleados, si es autónomo, o si no es autónomo.
+```{r, warning=FALSE, message=FALSE}
+p <- tabla_final %>%
+  filter(Fecha %in% c("1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"),
+         Territorio == c("Gran Canaria", "Tenerife", "La Gomera", "El Hierro", "Lanzarote", "La Palma", "Fuerteventura"), Situación.empleo == "Total.empleados") %>%
+    mutate(Fecha = as.Date(paste0(Fecha, "-01-01"))) %>%
+  group_by(Territorio, Fecha) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+  ggplot(aes(x = Territorio, y = empleado.por.isla, fill=Territorio, label=Fecha)) +
+   geom_boxplot(outlier.shape = NA) +
+    geom_jitter(shape=16, position=position_jitter(0.2))+
+    theme(legend.position = "none") +
+    xlab("isla") + 
+  ylab("Número de Empleados") +
+  ggtitle("Evolución del Número de Empleados en Canarias")
+
+ggplotly(p)
+```
+
+**Conclusión: ** Como se observa en el boxplot hay una gran diferencia en la proporción de empleados entre La Gomera, La Palma y El Hierro, con el resto de islas. Aunque, también son las islas donde hay una menor variación en la proporción de empleados con respecto al resto de las islas. Hay que destacar la gran variación que tiene Fuerteventura, teniendo una tasa máxima del 43% y una tasa mínima del 29%. También, destacar la tasa de empleo media de Gran Canaria que es la mayor respecto al resto con un 41%.
+
+
+Para poder explicar las grandes variaciones que tienen algunas islas en sus tasas, estudiaremos la evolución de la tasa de empleo con una serie temporal, para analizar en detalle cada periodo. Además, esta serie temporal también se encuentra en el dashboard, en la subpestaña "Serie temporal" que está en la pestaña "Situación del empleo", en el podrás modificar los indicadores del empleo, es decir, el total de empleados, si es autónomo, o si no es autónomo.
+
+```{r}
+ p <- tabla_final %>%
+  filter(Fecha %in% c("1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"),
+         Territorio %in% c("Gran Canaria", "Tenerife", "La Gomera", "El Hierro", "Lanzarote", "La Palma", "Fuerteventura"), Situación.empleo == "Total.empleados") %>%
+  mutate(Fecha = as.Date(paste0(Fecha, "-01-01"))) %>%
+  group_by(Territorio, Fecha) %>%
+  summarise(empleado_por_isla = Número.empleados / Población, .groups = 'drop') %>%
+  ggplot(aes(x = Fecha, y = empleado_por_isla, color = Territorio)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_x_date(date_breaks = "5 year", date_labels = "%Y") +
+  xlab("Año") + 
+  ylab("Proporción de Empleados") +
+  ggtitle("Evolución del Número de Empleados en Canarias")
+
+ggplotly(p)
+```
+
+
+**Conclusión: **  Como se observa la mayoría de las islas tienen una tendencia actual de crecimiento, exepto El Hierro y La Gomera que parecen estancadas con respecto a los años anteriores. Además, destacar que tanto Fuerteventura como Lanzarote fueron las islas donde la crisis del 2008 y la pandemia tuvieron un mayor impacto, perjudicando especialmente a Fuerteventura ya que paso de ser la isla con mejor proporción de empleo a principios de siglo a caer hasta la cuarta perdiendo un 10% respecto a principio de siglo. También, destacar el crecimiento de La Palma que entre 2021 y 2022 expermentó un gran crecimiento en su tasa de empleo (aumentó en un 2%).
+
+
+### Comparativa entre Gran Canaria y Tenerife
+
+Como en el gráfico anterior se encuentran todas las islas no se puede ver claramente la diferencia en la evolución de las islas capitalinas por la escala. Por está razón, elaboré un gráfico de líneas específico para estas dos islas.
+
+```{r}
+ p <- tabla_final %>%
+  filter(Fecha %in% c("1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023"),
+         Territorio %in% c("Gran Canaria", "Tenerife"), Situación.empleo == "Total.empleados") %>%
+  mutate(Fecha = as.Date(paste0(Fecha, "-01-01"))) %>%
+  group_by(Territorio, Fecha) %>%
+  summarise(empleado_por_isla = Número.empleados / Población, .groups = 'drop') %>%
+  ggplot(aes(x = Fecha, y = empleado_por_isla, color = Territorio)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_x_date(date_breaks = "5 year", date_labels = "%Y") +
+  xlab("Año") + 
+  ylab("Proporción de Empleados") +
+  ggtitle("Tenerife vs Gran Canaria")
+
+ggplotly(p)
+```
+
+**Conclusión: ** Como se observa en esta gráfica, tanto a Gran Canaria, como a Tenerife la crisis de 2008 les afectó en pleno crecimiento del empleo. Aunque, a Tenerife la crisis le afectó de una manera más significativa que a Gran Canaria. En 2013, ambas islas empiezan a crecer de nuevo hasta la pandemia donde vuelven a caer. Actualmente, ambas islas estan en pleno crecimiento, teniendo en 2023 la mayor tasa de empleo del siglo.
+
+### Mapa de calor de Gran Canaria en 2023.
+A continuación estudiaremos como se divide la proporción del empleo en los diferentes municipios de Gran Canaria en 2023 con un mapa de calor. Además, este mapa de calor también se encuentra en el dashboard, en la subpestaña "Mapa de calor de Gran Canaria" que está en la pestaña "Situación del empleo", en el podrás modificar el año del mapa.
+```{r}
+p <- tabla_final %>%
+  filter(Territorio %in% c("Agaete", "Agüimes", "Artenara", "Arucas", "Firgas", "Gáldar", "Ingenio", "Mogán", "Moya", "Las Palmas de Gran Canaria", "San Bartolomé de Tirajana", "La Aldea de San Nicolás", "Santa Brígida", "Santa Lucía de Tirajana", "Santa María de Guía de Gran Canaria", "Tejeda", "Telde", "Teror", "Valsequillo de Gran Canaria", "Valleseco", "Vega de San Mateo"), Fecha == "2023") %>%
+  group_by(Territorio, Situación.empleo) %>%
+  summarise(empleado.por.isla = Número.empleados / Población) %>%
+   ggplot(aes(Situación.empleo,Territorio,fill=empleado.por.isla)) + 
+    geom_tile(color = "lightblue",
+            lwd = 0.5,
+            linetype = 1) + 
+    scale_fill_gradientn(colors = brewer.pal(9, 'YlOrRd'))+
+    geom_text(aes(label = round(empleado.por.isla,2)), color = "blue") +
+    theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+ggplotly(p)
+```
+**Conclusión: ** Se observa como los municipios donde mayor proporción de empleados hay son: San Bartolomé de Tirajana, Mogán, Las Palmas y Agüimes. En cambio, los municipios donde menor proporción de empleados hay son: Artenara, Teror y Valleseco. Destacar a Santa Brígida que a pesar de no tener una proporción de empleo elvada, es el segundo municipio con un mayor número de autónomos.
+
+
+## Mapas coropléticos
+
+A continuación, estudiaremos tres diferentes mapas coropléticos en los que podremos comparar en que municipios hay una mayor tasa de empleo. En el dashboard es un solo mapa coroplético que explica la proporción del total del empleo, la proporción de autonómos y la proporción de no autónomos, pero en esta sección lo dividiremos en tres, ya que no podemos utilizar los desplegables.
+```{r}
+geoj <- geojson_read("geo_canarias_municipios.geojson",  what = "sp")
+
+tabla_geoj <- geoj %>% as_tibble()
+
+
+levels(tabla_final$Territorio)[levels(tabla_final$Territorio) == 'Frontera (hasta 2007)'] <- 'Frontera'
+
+
+tabla_final_geoj <- tabla_final %>%
+  filter(!Territorio %in% c("Canarias", "Gran Canaria", "La Palma", "La Gomera", "Lanzarote", "Fuerteventura", "El Hierro"), Fecha == "2023") %>%
+  pivot_wider(names_from = Situación.empleo, values_from = Número.empleados)
+
+```
+```{r}
+juntas <- tabla_geoj %>%
+  left_join(tabla_final_geoj,join_by(etiqueta==Territorio))
+```
+
+### Mapa coreplético de la proporción del total de empleados
+
+```{r}
+
+juntas <- juntas %>%
+  filter(!is.na(Población)) %>%
+  mutate(empleado.por.isla = Total.empleados / Población)
+
+etiquetas <-paste("<strong> Municipio: ",juntas$etiqueta ,"</strong><br>Total empleados: ",round(juntas$empleado.por.isla,2)) %>% 
+  lapply(htmltools::HTML)
+pal <- colorQuantile("YlOrRd", juntas$empleado.por.isla, n = 9)
+geoj %>%
+  leaflet() %>%  
+  setView(lng = -16.6291, lat = 28.2916, zoom = 7) %>% 
+  addPolygons(
+    fillColor = ~pal(juntas$empleado.por.isla), 
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions( 
+      weight = 2,
+      color = rgb(0.2,0.2,0.2),
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE
+    ),
+    label = etiquetas 
+  ) %>% 
+  addLegend("bottomleft", pal = pal, values =  juntas$empleado.por.isla,
+    title = "Tasa de empleo",
+    labFormat = function(type, cuts, p) {
+          n = length(cuts) 
+          x = (cuts[-n] + cuts[-1])/2
+          x=prettyNum(round(x,digits=2), big.mark = ",", scientific = FALSE)
+          as.character(x)
+        },
+    opacity = 1
+  )
+```
+**Conclusión: ** Como se puede observar en el mapa coroplético, Fuerteventura y Lanzarote son las islas que mejor tienen repartidas por municipio la proporción de empleo. Si observamos a Gran Canaria, el sur de la isla tiene una proporción mucho mayor de empleados respecto al norte (con excepción de Las Palmas). En las islas más pequeñas se observa como las capitales es donde se encuentra una mayor proporción de empleados respecto al resto de las islas. Teniendo en cuenta lo dicho anteriormente, podemos decir que los municipios donde hay una mayor tasa de empleo son las capitales y aquellos donde acuden un gran número de turistas como es el caso del sur de Gran Canaria y de Tenerife, Lanzarote y Fuerteventura.
+
+### Mapa coreplético de la proporción autónomos
+
+```{r}
+
+juntas <- juntas %>%
+  filter(!is.na(Población)) %>%
+  mutate(empleado.por.isla = autónomo / Población)
+
+etiquetas <-paste("<strong> Municipio: ",juntas$etiqueta ,"</strong><br>autónomos: ",round(juntas$empleado.por.isla,2)) %>% 
+  lapply(htmltools::HTML)
+pal <- colorQuantile("YlOrRd", juntas$empleado.por.isla, n = 9)
+geoj %>%
+  leaflet() %>%  
+  setView(lng = -16.6291, lat = 28.2916, zoom = 7) %>% 
+  addPolygons(
+    fillColor = ~pal(juntas$empleado.por.isla), 
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions( 
+      weight = 2,
+      color = rgb(0.2,0.2,0.2),
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE
+    ),
+    label = etiquetas 
+  ) %>% 
+  addLegend("bottomleft", pal = pal, values =  juntas$empleado.por.isla,
+    title = "Tasa de empleo",
+    labFormat = function(type, cuts, p) {
+          n = length(cuts) 
+          x = (cuts[-n] + cuts[-1])/2
+          x=prettyNum(round(x,digits=2), big.mark = ",", scientific = FALSE)
+          as.character(x)
+        },
+    opacity = 1
+  )
+```
+**Conclusión: ** En el caso de la proporción de autónomos podemos observar como la mayoría de los municipios de Lanzarote y de La Palma tienen una tasa bastante alta. También, destacan el sur de Gran Canaria y de Tenerife y el municipio de La Oliva en Fuerteventura. Asimismo, destacar los municipios más montañosos, ya que tienen una tasa bastante elevada. Por otra parte, señalar que en las capitales la proporción de autónomos no destaca respecto al resto de municipios teniendo todas las capitales un 6% en la tasa de autónomos. 
+
+### Mapa coreplético de la proporción de no autónomos
+
+```{r}
+
+juntas <- juntas %>%
+  filter(!is.na(Población)) %>%
+  mutate(empleado.por.isla = no.autónomo / Población)
+
+etiquetas <-paste("<strong> Municipio: ",juntas$etiqueta ,"</strong><br>No autónomos: ",round(juntas$empleado.por.isla,2)) %>% 
+  lapply(htmltools::HTML)
+pal <- colorQuantile("YlOrRd", juntas$empleado.por.isla, n = 9)
+geoj %>%
+  leaflet() %>%  
+  setView(lng = -16.6291, lat = 28.2916, zoom = 7) %>% 
+  addPolygons(
+    fillColor = ~pal(juntas$empleado.por.isla), 
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions( 
+      weight = 2,
+      color = rgb(0.2,0.2,0.2),
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE
+    ),
+    label = etiquetas 
+  ) %>% 
+  addLegend("bottomleft", pal = pal, values =  juntas$empleado.por.isla,
+    title = "Tasa de empleo",
+    labFormat = function(type, cuts, p) {
+          n = length(cuts) 
+          x = (cuts[-n] + cuts[-1])/2
+          x=prettyNum(round(x,digits=2), big.mark = ",", scientific = FALSE)
+          as.character(x)
+        },
+    opacity = 1
+  )
+```
+
+**Conclusión: ** Para el caso de los no autónomos podemos observar que es muy similar al mapa del total de empleados, ya que la mayor parte de esa proporción la conforman no autónomos.
+
+
+### Series temporales con modelo Arima y descomposición STL
+A continuación, realizaremos diferentes predicciones utilizando el modelo ARIMA, pero antes estudiaremos la descomposición STL para analizar la estacionalidad y tendencia de los datos. En este caso, se estudiará para Canarias en general y con el total del número de empleados.
+
+```{r}
+estacionalidad <- tabla_final %>%
+  filter(word(Fecha, 2) != "", Territorio == "Canarias", Situación.empleo == "Total.empleados") %>%
+  mutate(Fecha = case_when(
+    str_detect(Fecha, "Primer trimestre") ~ str_replace(Fecha, "Primer trimestre", "Q1"),
+    str_detect(Fecha, "Segundo trimestre") ~ str_replace(Fecha, "Segundo trimestre", "Q2"),
+    str_detect(Fecha, "Tercer trimestre") ~ str_replace(Fecha, "Tercer trimestre", "Q3"),
+    str_detect(Fecha, "Cuarto trimestre") ~ str_replace(Fecha, "Cuarto trimestre", "Q4")))
+
+
+estacionalidad <- tsibble(
+  date = yearquarter(estacionalidad$Fecha),
+  empleados = estacionalidad$Número.empleados,
+  index = date
+)
+
+estacionalidad |>
+  model(
+    STL(empleados ~ season(period = 4),
+    robust = TRUE)
+  ) |>
+  components() |>
+  autoplot()
+```
+
+
+**Conclusión: ** En la descomposición STL se observa claramente como si existe estacionalidad en los datos del empleo. Además, el resto nos muestra los picos causados por ambas crisis y la tendencia nos muestra un cremiento actual en la tasa de empleo.
+
+```{r}
+fit <- estacionalidad %>%
+  model(ARIMA(empleados))
+
+prediccion <- forecast(fit, h = "3 years")
+
+prediccion %>%
+  autoplot(estacionalidad) +
+  labs(title = "Predicción ARIMA en Canarias de 3 años")
+```
+
+```{r}
+estacionalidad <- estacionalidad %>%
+  filter(!date %in% c("2020 Q1", "2020 Q2", "2020 Q3", "2020 Q4", "2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4"))
+
+estacionalidad_tsibble <- estacionalidad %>%
+  as_tsibble(index = date) %>%
+  fill_gaps()
+
+fit <- estacionalidad_tsibble %>%
+  model(ARIMA(empleados))
+
+predicciones <- forecast(fit, h = "3 years")
+
+predicciones %>%
+  autoplot(estacionalidad_tsibble)  +
+  labs(title = "Predicción ARIMA en Canarias de 3 años sin el periodo del covid")
+```
+
+**Conclusión: ** Realizando una predicción para tres años se observa un crecimiento del empleo en Canarias. Sin embargo, los intervalos de confianza estan en un rango grande de valores y por tanto, no podemos decir que la predicción es buena. Haciendo la predicción sin el periodo del covid los intervalos son ligeramente mejor, pero aún así no se considera suficientemente buena la predicción
+
+
+### Análisis de atributos
+
+#### Matriz de correlación
+
+```{r}
+data <- tabla_final %>%
+  pivot_wider(names_from = Situación.empleo, values_from = Número.empleados) %>%
+  filter( 
+    Territorio == "Gran Canaria" |
+    Territorio == "Tenerife" |
+    Territorio == "Lanzarote" |
+    Territorio == "Fuerteventura" | 
+    Territorio == "La Gomera" | 
+    Territorio == "La Palma" | 
+    Territorio == "El Hierro", Fecha == 2023
+  ) %>%
+  column_to_rownames(var="Territorio") %>%
+  select(Población,no.autónomo,autónomo, Total.empleados) 
+
+pca <- prcomp(data,scale = TRUE) 
+
+data %>% 
+  scale()  %>%
+  cor(use='complete.obs') %>% 
+  hchart()
+```
+**Conclusión: ** En la matriz de correlación observamos el valor de correlación para cada par de atributos. Un valor positivo de la correlación nos indica que cuando aumenta el valor de un atributo, aumenta el valor del otro y cuanto más cerca de 1 es la correlación más perfecta es esa relación y mejor se ajustan los valores de los atributos a la recta de regresión. Cuando el valor de la correlación es negativo cuando aumenta el valor de un atributo disminuye el valor del otro y cuanto más cerca está de -1 la correlación más perfecta es esa relación. Cuando el valor de la correlación esté cercano a cero no existe una relación lineal clara entre ambos atributos. Como se observa en la matriz de correlación, las variables de relacionan entre sí positivamente, es decir, cuando el valor de una aumenta, aumenta el de la otra. Además, todos los valores son 1 o próximos a 1, por tanto podemos decir que los valores se ajustan practicamente de forma perfecta y la relación entre las variables es muy buena. Esto se puede explicar, ya que la proporción de las tasas autónomos son muy similares respecto al total de los empleados en la mayoría de los casos, como se pudo obsevar en el diagrama de barras agrupadas anteriormente.
+
+
+```{r}
+p <- tibble(
+  label=paste("PC",1:length(pca$sdev)), # creación etiquetas para el eje horizontal
+  varPercent = pca$sdev^2/sum(pca$sdev^2) * 100 # cálculo porcentaje de varianza explicada
+) %>%
+  ggplot(aes(x=label,y=varPercent)) + # creación gráfico de barras interactivo
+    geom_bar(stat = "identity") +
+    labs(x= "Componentes Principales", 
+         y= "Porcentaje varianza explicada")
+ggplotly(p) 
+```
+
+**Conclusión: ** Este diagrama de barras muestra la varianza que explica cada una de las componentes principales respecto al total de la varianza de todas las componentes. Como se puede observar la primera componente explica 99% de la varianza y por tanto podemos eliminar el resto de las componentes principales si seguimos la regla de elminar aquellas que no expliquen al menos un 2% de la varianza total.
+
+```{r}
+hchart(pca)
+```
+
+**Conclusión: ** En este diagrama de dispersión de los valores de las dos primeras componentes también se ilustra con vectores el peso de cada atributo original en las dos componentes. El tamaño de estos vectores nos indica la magnitud del peso de dicho atributo en el cálculo de las dos primeras componentes, y su orientación nos indica si tiene más peso en una componente que en otra. Por ejemplo, un vector horizontal nos indica que el atributo no cuenta para la segunda componente y un vector vertical que el atributo no cuenta para la primera componente. Por otro lado, si en el diagrama de dispersión aparecen muchos puntos aglomerados nos indica que las dos primeras componentes no son capaces de discriminar bien entre países, es decir no podemos identificar bien un país y separarlo de los otros usando los valores de las dos primeras componentes. En el caso de esta gráfica observamos muchos puntos muy pegados entre sí, lo que nos indica que el uso de las primeras dos componentes principales no permite una buena discriminación entre los países. Observamos que las variables no.autónomo y Total.empleados son las que menos peso tienen en las dos primeras componentes, ya que sus vectores son los más pequeños. La variable población tiene mucho peso en la PC1 y poco en la PC2, mientras que la variable autónomos tiene más peso en la PC2 que en la PC1.
+
+
+## Conclusiones y Trabajos Futuros
+A través de un análisis exhaustivo del mercado laboral en Canarias podemos llegar a las siguientes conclusiones:
+
+En primer lugar, podemos concluir que la mayoría de los trabajadores en Canarias son no autónomos, siendo la proporción más alta de autónomos en todos los municipios de las islas un 10% en La Oliva (Fuerteventura). Además, islas menores como La Gomera, La Palma y El Hierro exhiben una menor proporción de empleados en comparación con las islas más grandes como Gran Canaria y Tenerife. El estudio también ha revelado cómo eventos globales como la crisis financiera de 2008 y la pandemia de COVID-19 impactaron significativamente en el empleo, aunque la recuperación en el sector empleador post-crisis ha sido notable en algunas islas, mientras que otras han experimentado un crecimiento estancado o lento como es el caso de Fuerteventura o Lanzarote. Por último, destacar que las tasas más altas de empleo se encuentran en las capitales de las islas y en los sectores más turísticos como son el sur de Gran canaria, Tenerife o las islas de Lanzarote y Fuerteventura. En cuanto al grado de consecución de los objetivos propuestos inicialmente, el proyecto ha logrado la mayoría de estos, aunque la precisión en el modelado predictivo bajo ciertos escenarios económicos fluctuantes podría mejorarse.
+
+De cara al futuro, el desarrollo de este proyecto podría verse beneficiado por diferentes ideas que me han surgido durante el desarrollo del proyecto. Estas son las siguientes:
+
+Sería beneficioso afinar los modelos ARIMA incorporando más variables predictivas que puedan capturar mejor la complejidad del mercado laboral. Además, un desglose del análisis por sectores económicos ayudaría a identificar qué sectores están impulsando el crecimiento del empleo y cuáles son más vulnerables a las crisis. Realizar estudios comparativos con otras regiones insulares o archipiélagos a nivel global podría proporcionar una perspectiva más amplia sobre cómo las políticas y estructuras económicas influyen en la resiliencia laboral.
